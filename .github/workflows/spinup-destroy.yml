@@ -8,7 +8,7 @@ env:
   PACKAGES_TOKEN: ${{secrets.PACKAGES_TOKEN}}
   AZURE_RESOURCE_GROUP: cd-with-actions-nodeapp
   AZURE_APP_PLAN: actions-deployment-nodeapp-azure
-  AZURE_LOCATION: '"Central US"'
+  AZURE_LOCATION: '"South Central US"'
   #################################################
   ### USER PROVIDED VALUES ARE REQUIRED BELOW   ###
   #################################################
