@@ -1,7 +1,8 @@
 {
-  "name": "express-ts-app",
+  "name": "deployment-nodeapp-azure",
+  "author": "irvv17",
   "version": "0.0.1",
-  "description": "express-ts-app initialised with create-express-typescript-application.",
+  "description": "express-ts-app initialised with create-express-typescript-application, using it in a deployment-nodeapp-azure example.",
   "main": "src/index.ts",
   "scripts": {
     "build": "tsc",
