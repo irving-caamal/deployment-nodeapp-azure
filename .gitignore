@@ -3,3 +3,6 @@ build/
 logs/
 
 src/app/.notes
+
+
+.idea/
