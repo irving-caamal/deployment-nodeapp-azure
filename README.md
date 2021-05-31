@@ -3,8 +3,10 @@
 
 > This repo was created to clear how to deploy a single docker container runing a basic Node.js application with Typescript using [azure/webapps-deploy@v2]() 
 
+
+
 > Related with this issues
-> [#34451](https://github.com/MicrosoftDocs/azure-docs/issues/34451), [#62946](https://github.com/MicrosoftDocs/azure-docs/issues/62946), [#31771](https://github.com/MicrosoftDocs/azure-docs/issues/31771)
+> [#34451](https://github.com/MicrosoftDocs/azure-docs/issues/34451), [#62946](https://github.com/MicrosoftDocs/azure-docs/issues/62946), [#31771](https://github.com/MicrosoftDocs/azure-docs/issues/31771), [46401](https://github.com/MicrosoftDocs/azure-docs/issues/46401)
 
 Another common situations why your app is not running:
 
@@ -19,6 +21,9 @@ Another common situations why your app is not running:
 
 [Test live example deployed with this code](https://irvv17-deployment-nodeapp-azure.azurewebsites.net/api/server-status)
 
+
+> This works if you came from [GithubLab, GitHub Actions: Continuous Delivery with Azure](https://lab.github.com/githubtraining/github-actions:-continuous-delivery-with-azure) 'cause the starter example with static files didn't work for me,you can make work it with this configuration.
+> 
 Project structure created with **npx**
 
 ``` npx create-express-typescript-application express-ts-app```
