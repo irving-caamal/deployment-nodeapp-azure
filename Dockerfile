@@ -3,6 +3,7 @@ WORKDIR /app
 COPY --chown=node:node package.json .
 RUN npm install
 RUN npm install -g typescript
+RUN npm install typesript
 COPY --chown=node:node . ./
 RUN npm i ts-node
 RUN npm run build
