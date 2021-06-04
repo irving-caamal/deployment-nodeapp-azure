@@ -66,6 +66,13 @@ jobs:
         with:
           repo-token: ${{secrets.GITHUB_TOKEN}}
           image-name: ${{env.DOCKER_IMAGE_NAME}}
+          tag: latest
+
+      - name: delete-package-versions
+        uses: actions/delete-package-versions@v1
+        with:
+          package-name: ${{env.DOCKER_IMAGE_NAME}}
+          num-old-versions-to-delete: 1
 
   Deploy-to-Azure:
     runs-on: ubuntu-latest
@@ -85,10 +92,6 @@ jobs:
           login-server: ${{env.IMAGE_REGISTRY_URL}}
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - run: |
-          docker build . -t ${{env.IMAGE_REGISTRY_URL}}/${{ github.repository }}/${{env.DOCKER_IMAGE_NAME}}:${{ github.sha }}
-          docker push ${{env.IMAGE_REGISTRY_URL}}/${{ github.repository }}/${{env.DOCKER_IMAGE_NAME}}:${{ github.sha }}
 
       - name: Deploy web app container
         uses: azure/webapps-deploy@v2
