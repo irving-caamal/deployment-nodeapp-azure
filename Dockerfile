@@ -7,4 +7,4 @@ RUN npm install typescript
 COPY --chown=node:node . ./
 RUN npm i ts-node
 ENV PORT 8000
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start"]
