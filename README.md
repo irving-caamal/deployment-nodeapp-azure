@@ -5,7 +5,7 @@
 
 
 
-> Related with this issues
+> Related with these issues
 > [#34451](https://github.com/MicrosoftDocs/azure-docs/issues/34451), [#62946](https://github.com/MicrosoftDocs/azure-docs/issues/62946), [#31771](https://github.com/MicrosoftDocs/azure-docs/issues/31771), [46401](https://github.com/MicrosoftDocs/azure-docs/issues/46401)
 
 Another common situations why your app is not running:
@@ -20,9 +20,10 @@ Another common situations why your app is not running:
 > Following this steps you will be able to deploy your app with a Single dockerfile
 
 [Test live example deployed with this code](https://irvv17-deployment-nodeapp-azure.azurewebsites.net/api/server-status)
+
 ⚠️ If you try to test the app you need to wait a couple of minutes 'cause this deploy [turn off the server on inactivity](https://docs.microsoft.com/en-us/azure/app-service/configure-common), just wait for a minute after hit a request and you will got a response.
 
-> This works if you came from [GithubLab, GitHub Actions: Continuous Delivery with Azure](https://lab.github.com/githubtraining/github-actions:-continuous-delivery-with-azure) 'cause the starter example with static files didn't work for me,you can make work it with this configuration.
+> This works if you came from [GithubLab, GitHub Actions: Continuous Delivery with Azure](https://lab.github.com/githubtraining/github-actions:-continuous-delivery-with-azure) 'cause the starter example with static files didn't work for me,you can make work it with this configuration too.
 > 
 Project structure created with **npx**
 
