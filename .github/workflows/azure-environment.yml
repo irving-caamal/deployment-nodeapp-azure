@@ -4,18 +4,15 @@ on:
   pull_request:
     types: [labeled]
 
+permissions:
+  contents: read
+  id-token: write
+
 env:
-  PACKAGES_TOKEN: ${{secrets.PACKAGES_TOKEN}}
   AZURE_RESOURCE_GROUP: cd-with-actions-nodeapp
   AZURE_APP_PLAN: actions-deployment-nodeapp-azure
-  AZURE_LOCATION: '"South Central US"'
-  #################################################
-  ### USER PROVIDED VALUES ARE REQUIRED BELOW   ###
-  #################################################
-  #################################################
-  ### REPLACE USERNAME WITH GH USERNAME         ###
+  AZURE_LOCATION: southcentralus
   AZURE_WEBAPP_NAME: irvv17-deployment-nodeapp-azure
-  #################################################
 
 jobs:
   setup-up-azure-resources:
@@ -25,29 +22,31 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Azure login
-        uses: azure/login@v1
+        uses: azure/login@v3
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Create Azure resource group
         if: success()
         run: |
-          az group create --location ${{env.AZURE_LOCATION}} --name ${{env.AZURE_RESOURCE_GROUP}} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+          az group create --location "$AZURE_LOCATION" --name "$AZURE_RESOURCE_GROUP" --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       - name: Create Azure app service plan
         if: success()
         run: |
-          az appservice plan create --resource-group ${{env.AZURE_RESOURCE_GROUP}} --name ${{env.AZURE_APP_PLAN}} --is-linux --sku F1 --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+          az appservice plan create --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_APP_PLAN" --is-linux --sku F1 --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       - name: Create webapp resource
         if: success()
         run: |
-          az webapp create --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --plan ${{ env.AZURE_APP_PLAN }} --name ${{ env.AZURE_WEBAPP_NAME }}  --deployment-container-image-name nginx --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+          az webapp create --resource-group "$AZURE_RESOURCE_GROUP" --plan "$AZURE_APP_PLAN" --name "$AZURE_WEBAPP_NAME" --deployment-container-image-name nginx --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
       - name: Configure webapp to use GitHub Packages
         if: success()
         run: |
-          az webapp config container set --docker-custom-image-name nginx --docker-registry-server-password ${{secrets.REGISTRY_PASSWORD}} --docker-registry-server-url https://docker.pkg.github.com --docker-registry-server-user ${{github.actor}} --name ${{ env.AZURE_WEBAPP_NAME }} --resource-group ${{ env.AZURE_RESOURCE_GROUP }} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}}
+          az webapp config appsettings set --resource-group "$AZURE_RESOURCE_GROUP" --name "$AZURE_WEBAPP_NAME" --settings WEBSITES_PORT=80 --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}"
   destroy-azure-resources:
     runs-on: ubuntu-latest
 
@@ -55,14 +54,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v6
 
       - name: Azure login
-        uses: azure/login@v1
+        uses: azure/login@v3
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       - name: Destroy Azure environment
         if: success()
         run: |
-          az group delete --name ${{env.AZURE_RESOURCE_GROUP}} --subscription ${{secrets.AZURE_SUBSCRIPTION_ID}} --yes
+          az group delete --name "$AZURE_RESOURCE_GROUP" --subscription "${{ vars.AZURE_SUBSCRIPTION_ID }}" --yes
