@@ -51,6 +51,7 @@ The repository’s GitHub Actions workflows use this sequence:
 
 The workflows are:
 
+- `.github/workflows/ci.yml` — validates pull requests and pushes to `main` by building the application and Docker image.
 - `.github/workflows/deploy-production.yml` — builds and deploys on pushes to `main`.
 - `.github/workflows/stage.yml` — runs for pull requests labeled `stage`.
 - `.github/workflows/azure-environment.yml` — creates or destroys the sample Azure environment for pull requests labeled `spin up environment` or `destroy environment`.
@@ -63,7 +64,7 @@ The workflows reference these secrets:
 
 - `GHCR_READ_TOKEN` — a GitHub token with `read:packages`, used by App Service to pull the private image.
 
-Configure these repository or environment variables for Azure OIDC:
+Configure these GitHub repository or environment secrets for Azure OIDC:
 
 - `AZURE_CLIENT_ID` — Entra application/service principal client ID.
 - `AZURE_TENANT_ID` — Entra tenant ID.
