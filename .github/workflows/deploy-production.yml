@@ -1,105 +1,87 @@
-name: Deploy to Production
+name: Deploy to production
 
 on:
-  pull_request:
-    branches:
-      - main
   push:
-    branches:
-      - main
+    branches: [main]
+
+permissions:
+  contents: read
+  packages: write
+  id-token: write
 
 env:
-  DOCKER_IMAGE_NAME: deployment-nodeapp-azure
-  IMAGE_REGISTRY_URL: docker.pkg.github.com
-  #################################################
-  ### USER PROVIDED VALUES ARE REQUIRED BELOW   ###
-  #################################################
-  #################################################
-  ### REPLACE USERNAME WITH GH USERNAME         ###
   AZURE_WEBAPP_NAME: irvv17-deployment-nodeapp-azure
-  #################################################
+  AZURE_RESOURCE_GROUP: cd-with-actions-nodeapp
+  IMAGE_NAME: ghcr.io/${{ github.repository }}/deployment-nodeapp-azure
 
 jobs:
-  build:
-
+  build-and-deploy:
+    name: Build and deploy container
     runs-on: ubuntu-latest
-
     steps:
-      - uses: actions/checkout@v1
-      - name: npm install and build webpack
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and build application
         run: |
-          npm install
-          npm run build --if-present
-      - name: Creating artifact directories
+          npm ci
+          npm run build
+
+      - name: Validate Azure OIDC configuration
+        env:
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         run: |
-          mkdir buildartifacts
-      # Archive build artifact
-      - name: Archive Application
-        uses: montudor/action-zip@v0.1.0
-        with:
-          args: zip -qq -r ./buildartifacts/application.zip ./
-      # Uploading application to build artifact
-      - name: Upload Application to Build Artifact
-        continue-on-error: false
-        uses: actions/upload-artifact@v2
-        with:
-          name: buildartifacts
-          path: buildartifacts
+          test -n "$AZURE_CLIENT_ID" || { echo "::error::Missing AZURE_CLIENT_ID secret"; exit 1; }
+          test -n "$AZURE_TENANT_ID" || { echo "::error::Missing AZURE_TENANT_ID secret"; exit 1; }
+          test -n "$AZURE_SUBSCRIPTION_ID" || { echo "::error::Missing AZURE_SUBSCRIPTION_ID secret"; exit 1; }
 
-  Build-Docker-Image:
-    runs-on: ubuntu-latest
-    needs: build
-    name: Build image and store in GitHub Packages
-    steps:
-      # Downloading build artifact
-      - name: Download a Build Artifact
-        uses: actions/download-artifact@v2
-        continue-on-error: false
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
         with:
-          name: buildartifacts
-          path: buildartifacts
-      # Uzipping build artifacts
-      - name: unzipping build artifact
-        uses: montudor/action-zip@v0.1.0
-        with:
-          args: unzip -qq ./buildartifacts/application.zip -d .
-
-      - name: create image and store in Packages
-        uses: mattdavis0351/actions/docker-gpr@1.3.0
-        with:
-          repo-token: ${{secrets.GITHUB_TOKEN}}
-          image-name: ${{env.DOCKER_IMAGE_NAME}}
-
-      - name: Delete old packages
-        uses: actions/delete-package-versions@v1
-        with:
-          package-name: ${{env.DOCKER_IMAGE_NAME}}
-          num-old-versions-to-delete: 1
-
-  Deploy-to-Azure:
-    runs-on: ubuntu-latest
-    needs: Build-Docker-Image
-    name: Deploy app container to Azure
-    steps:
-      - name: 'Checkout GitHub Action'
-        uses: actions/checkout@main
-
-      - name: "Login via Azure CLI"
-        uses: azure/login@v1
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - uses: azure/docker-login@v1
-        with:
-          login-server: ${{env.IMAGE_REGISTRY_URL}}
+          registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy web app container
-        uses: azure/webapps-deploy@v2
+      - name: Build and push image
+        uses: docker/build-push-action@v7
         with:
-          app-name: ${{env.AZURE_WEBAPP_NAME}}
-          images: ${{env.IMAGE_REGISTRY_URL}}/${{ github.repository }}/${{env.DOCKER_IMAGE_NAME}}:${{ github.sha }}
-      - name: Azure logout
+          context: .
+          push: true
+          tags: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+
+      - name: Log in to Azure with OIDC
+        uses: azure/login@v3
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Configure App Service container
+        env:
+          GHCR_READ_TOKEN: ${{ secrets.GHCR_READ_TOKEN }}
         run: |
-          az logout
+          az webapp config container set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --docker-custom-image-name "$IMAGE_NAME:${GITHUB_SHA}" \
+            --docker-registry-server-url https://ghcr.io \
+            --docker-registry-server-user "${GITHUB_REPOSITORY_OWNER}" \
+            --docker-registry-server-password "$GHCR_READ_TOKEN"
+          az webapp config appsettings set \
+            --resource-group "$AZURE_RESOURCE_GROUP" \
+            --name "$AZURE_WEBAPP_NAME" \
+            --settings WEBSITES_PORT=8000 NODE_ENV=production
+
+      - name: Deploy image to Azure Web App
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ env.AZURE_WEBAPP_NAME }}
+          images: ${{ env.IMAGE_NAME }}:${{ github.sha }}

@@ -1,69 +1,138 @@
-# Basic Node.js App with Express
-#### Deployed into an azure container using Azure WebApp package with Gihub Actions
+# Node.js Express app on Azure App Service
 
-> This repo was created to clear how to deploy a single docker container runing a basic Node.js application with Typescript using [azure/webapps-deploy@v2]() 
+This repository contains a small Express application written in TypeScript and packaged as a Linux container for Azure App Service.
 
+The application exposes:
 
+- `GET /api/server-status/` — returns the service status.
+- `GET /api/server-status/routes` — lists the routes discovered at startup.
 
-> Related with these issues
-> [#34451](https://github.com/MicrosoftDocs/azure-docs/issues/34451), [#62946](https://github.com/MicrosoftDocs/azure-docs/issues/62946), [#31771](https://github.com/MicrosoftDocs/azure-docs/issues/31771), [46401](https://github.com/MicrosoftDocs/azure-docs/issues/46401)
+## Run locally
 
-Another common situations why your app is not running:
+Requirements: Node.js and npm.
 
-1. don't use ``EXPOSE`` flag on ``Dockerfile`` (apparently Azure use it internally)
-
-2. SET [ WEBSITES_CONTAINER_START_TIME_LIMIT](https://docs.microsoft.com/en-us/archive/blogs/waws/things-you-should-know-web-apps-and-linux#if-your-site-doesnt-start-check-the-docker-logapplies-to-web-app-for-containers), increase it to max timeout
-
-3. [USE PERSONAL ACCESS TOKEN INSTEAD GITHUB_TOKEN](https://github.community/t/github-actions-continuous-delivery-with-azure-username-with-uppercase-character/149895/5) cause github tokens expires.
-
-
-> Following this steps you will be able to deploy your app with a Single dockerfile
-
-[Test live example deployed with this code](https://irvv17-deployment-nodeapp-azure.azurewebsites.net/api/server-status)
-
-⚠️ If you try to test the app you need to wait a couple of minutes 'cause this deploy [turn off the server on inactivity](https://docs.microsoft.com/en-us/azure/app-service/configure-common), just wait for a minute after hit a request and you will got a response.
-
-> This works if you came from [GithubLab, GitHub Actions: Continuous Delivery with Azure](https://lab.github.com/githubtraining/github-actions:-continuous-delivery-with-azure) 'cause the starter example with static files didn't work for me,you can make work it with this configuration too.
-> 
-Project structure created with **npx**
-
-``` npx create-express-typescript-application express-ts-app```
-
-Project structure:
+```bash
+npm install
+npm run build
+npm start
 ```
-                                                                    ─╯
-.
-├── build
-│   ├── src
-│   │   ├── app
-│   │   │   ├── sample
-│   │   │   └── server-status
-│   │   ├── constants
-│   │   │   └── endpoint.js
-│   │   ├── utils
-│   │   │   └── getFilesWithKeyword.js
-│   │   ├── index.js
-│   │   └── server.js
-│   └── config.json
-├── src
-│   ├── app
-│   │   ├── sample
-│   │   │   └── sample.router.ts
-│   │   └── server-status
-│   │       ├── server-status.router.ts
-│   │       └── server.status.service.ts
-│   ├── constants
-│   │   └── endpoint.ts
-│   ├── utils
-│   │   └── getFilesWithKeyword.ts
-│   ├── index.ts
-│   └── server.ts
-├── Dockerfile
-├── README.md
-├── config.json
-├── package-lock.json
-├── package.json
-└── tsconfig.json
 
+The server listens on `PORT`, or `8000` when `PORT` is not set. Test it with:
 
+```bash
+curl http://localhost:8000/api/server-status/
 ```
+
+For development with TypeScript execution and file watching:
+
+```bash
+npm run dev:nodemon
+```
+
+## Build and run the container
+
+```bash
+docker build -t deployment-nodeapp-azure .
+docker run --rm -p 8000:8000 -e NODE_ENV=production deployment-nodeapp-azure
+```
+
+Then test `http://localhost:8000/api/server-status/`.
+
+The multi-stage Dockerfile compiles TypeScript in a builder image and copies only the production dependencies and compiled output into the runtime image. The application listens on port `8000`; Azure App Service is configured with `WEBSITES_PORT=8000` by the deployment workflows.
+
+## Azure deployment model
+
+The repository’s GitHub Actions workflows use this sequence:
+
+1. Install dependencies and compile the TypeScript project.
+2. Build and push a commit-tagged Docker image to GitHub Container Registry (`ghcr.io`).
+3. Log in to Azure with GitHub OIDC.
+4. Configure and deploy the image to the Azure Web App with `azure/webapps-deploy@v3`.
+
+The workflows are:
+
+- `.github/workflows/ci.yml` — validates pull requests and pushes to `main` by building the application and Docker image.
+- `.github/workflows/deploy-production.yml` — builds and deploys on pushes to `main`.
+- `.github/workflows/stage.yml` — runs for pull requests labeled `stage`.
+- `.github/workflows/azure-environment.yml` — creates or destroys the sample Azure environment for pull requests labeled `spin up environment` or `destroy environment`.
+
+The production workflow deploys the image tagged with the commit SHA. The stage workflow targets the same App Service, so staging a pull request replaces the currently running app until the next production deployment.
+
+## Required GitHub configuration
+
+The workflows reference these secrets:
+
+- `GHCR_READ_TOKEN` — a GitHub token with `read:packages`, used by App Service to pull the private image.
+
+Configure these GitHub repository or environment secrets for Azure OIDC:
+
+- `AZURE_CLIENT_ID` — Entra application/service principal client ID.
+- `AZURE_TENANT_ID` — Entra tenant ID.
+- `AZURE_SUBSCRIPTION_ID` — Azure subscription ID.
+
+The federated identity credential must trust this repository and the relevant `main` branch or pull-request subject. The Azure identity needs permission to deploy to the Web App and update its container configuration.
+
+The workflows also use these environment values:
+
+```text
+AZURE_RESOURCE_GROUP=cd-with-actions-nodeapp
+AZURE_APP_PLAN=actions-deployment-nodeapp-azure
+AZURE_LOCATION=South Central US
+AZURE_WEBAPP_NAME=irvv17-deployment-nodeapp-azure
+```
+
+Do not commit credentials or registry passwords. Keep `GHCR_READ_TOKEN` as a repository secret and configure the GitHub Container Registry package so the token can read the image.
+
+## Verify an Azure deployment
+
+```bash
+az webapp show \
+  --resource-group cd-with-actions-nodeapp \
+  --name irvv17-deployment-nodeapp-azure \
+  --query '{state:state,host:defaultHostName,kind:kind,sku:sku}'
+
+curl -i https://irvv17-deployment-nodeapp-azure.azurewebsites.net/api/server-status/
+```
+
+The deployed resource currently has these verified properties (checked 2026-08-12):
+
+- Subscription: `AzureFREE` (`fa7522c1-65ed-4ac6-a35c-4fd1cda23d33`)
+- Resource group: `cd-with-actions-nodeapp`
+- Region: South Central US
+- App Service plan: `actions-deployment-nodeapp-azure`, Linux F1 Free tier
+- Web App: `irvv17-deployment-nodeapp-azure`
+- Host: <https://irvv17-deployment-nodeapp-azure.azurewebsites.net>
+- Container image: `docker.pkg.github.com/irvv17/deployment-nodeapp-azure/deployment-nodeapp-azure:ddff322510169ecac63a3bc182519c113e5ce467`
+
+At the time of this update, the health URL returned HTTP 503. A 503 means the App Service front end is reachable but the container is not currently serving requests. Check the container startup logs before redeploying:
+
+```bash
+az webapp log config \
+  --resource-group cd-with-actions-nodeapp \
+  --name irvv17-deployment-nodeapp-azure \
+  --docker-container-logging filesystem
+
+az webapp log tail \
+  --resource-group cd-with-actions-nodeapp \
+  --name irvv17-deployment-nodeapp-azure
+```
+
+Common checks are that the image is still available to App Service, the container listens on `0.0.0.0`, and the configured container port matches the application’s `PORT` value.
+
+## Project layout
+
+```text
+src/
+  app/
+    sample/
+    server-status/
+  constants/
+  utils/
+  index.ts
+  server.ts
+Dockerfile
+package.json
+tsconfig.json
+```
+
+Build output is written to `build/` and is generated by `npm run build`.
